@@ -1,1 +1,6 @@
 .sdd/state.json
+.env*
+!.env.example
+*.pem
+*.key
+*credentials*.json
