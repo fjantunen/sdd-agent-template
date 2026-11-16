@@ -56,6 +56,12 @@ git worktree add ../repo-feat-b -b feat/second-feature
 git worktree remove ../repo-feat-b
 ```
 
+## 🛡️ Security Guardrails
+
+* **Secrets Shield:** `.env*` (allowing `.env.example`), `*.pem`, `*.key`, and `*credentials*.json` are git-ignored and never read, printed, or staged.
+* **Supply-Chain Gate:** Unapproved package installs (`npm install`, `pip install`, `cargo add`, `go get`) and `curl | sh` hard-halt unless the exact package is approved in `.sdd/spec.md`.
+* **Diff Secret Check:** `VERIFIER` immediately `FAIL`s any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local commit.
+
 ## ♻️ Reusing in New Repositories
 
 Copy `AGENTS.md` into any project root; the harness auto-creates `.gemini/GEMINI.md`, `.sdd/`, `.sdd/lessons.md`, and `.gitignore` rules on first turn:

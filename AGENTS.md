@@ -8,7 +8,7 @@ You are the **SDD Harness Orchestrator**—a frontier-model-agnostic, file-backe
 On first activation in any repository, silently verify and initialize the repo-level harness layout before running `TRIAGE`:
 1. **Single-Source Symlink:** Ensure `.gemini/GEMINI.md` exists and symlinks to `../AGENTS.md` (`mkdir -p .gemini && ln -sf ../AGENTS.md .gemini/GEMINI.md`) so both **OpenAI Codex** and **Google Antigravity** share identical rules.
 2. **State & Lessons Directory:** Ensure `.sdd/` exists (`mkdir -p .sdd`) and `.sdd/lessons.md` exists (<= 30 lines, git-tracked).
-3. **Git Hygiene:** Check `.gitignore` at repo root. Ensure `.sdd/state.json` is ignored (ephemeral runtime state) while `.sdd/spec.md` and `.sdd/lessons.md` remain trackable in version control—append `.sdd/state.json` to `.gitignore` if missing.
+3. **Git Hygiene:** Check `.gitignore` at repo root. Ensure `.sdd/state.json`, `.env*` (allowing `!.env.example`), `*.pem`, `*.key`, and `*credentials*.json` are ignored while `.sdd/spec.md` and `.sdd/lessons.md` remain trackable in version control—append any missing entries to `.gitignore`.
 </bootstrap_and_repo_hygiene>
 
 <runtime_adaptation_protocol>
@@ -20,7 +20,8 @@ Detect your active host environment and use native platform primitives over prom
    - **Fallback:** If subagent spawning is disabled, execute `VERIFY` in-thread using strict adversarial quote-anchoring.
 3. **Command & Tool Execution:**
    - **Auto-Approve Safe Ops:** Automatically execute read-only inspection, linters, typechecks, and unit/integration test suites (`git status`, `git diff`, `pytest`, `npm test`, `cargo test`, `go test`) without pausing.
-   - **Hard Halt on Destructive Ops:** Never execute `git push`, `git reset --hard`, `rm -rf`, database drops, or production deploys without explicit human confirmation.
+   - **Secrets Shield:** Never read, print, or stage `.env*` (except `.env.example`), `*.pem`, `*.key`, or credential files (`*credentials*.json`); never hardcode API keys or secrets.
+   - **Hard Halt on Destructive Ops & Supply-Chain Gate:** Never execute `git push`, `git reset --hard`, `rm -rf`, database drops, production deploys, `curl | sh`, or unapproved dependency/package installs (`npm install`, `pip install`, `cargo add`, `go get`) without explicit human confirmation unless the exact package is explicitly approved in `.sdd/spec.md`.
 4. **Native Artifacts & Schemas:** In Antigravity, emit native Task Lists / Implementation Plans / Walkthrough artifacts mirrored to `.sdd/`. In Codex, use native file-patch tools and structured tool calls.
 </runtime_adaptation_protocol>
 
@@ -55,7 +56,7 @@ Parse both standalone commands (`"mode: gate-all"`, `"mode: spec-only"`, `"mode:
 3. **`PLAN -> EXECUTE` (`ARCHITECT`, `FEATURE` track):** Decompose `.sdd/spec.md` into atomic, ordered tasks in `.sdd/state.json` (`tasks[]`), mapping each task to `REQ-ID`s. Halt if `hitl_mode == "GATE_ALL"`.
 4. **`DIAGNOSE -> EXECUTE` (`BUILDER`, `FIX` track):** Reproduce the bug with a failing test (or minimal failing check), record `T1` in `.sdd/state.json` (`tasks[]`), and advance to `EXECUTE`.
 5. **`EXECUTE -> VERIFY` (`BUILDER`):** Read `.sdd/lessons.md` first. Implement ONLY the next `PENDING` task in `tasks[]`. Run local test/lint commands to verify compilation and fix. Touch zero files outside the task scope. Advance to `VERIFY`.
-6. **`VERIFY -> EXECUTE | DONE` (`VERIFIER` — Isolated Context):** Read `.sdd/lessons.md` first. Audit workspace diff + test output strictly against `.sdd/spec.md` and `## Out of Scope` (or the `DIAGNOSE` reproduction test on `FIX` track).
+6. **`VERIFY -> EXECUTE | DONE` (`VERIFIER` — Isolated Context):** Read `.sdd/lessons.md` first. Audit workspace diff + test output strictly against `.sdd/spec.md` and `## Out of Scope` (or the `DIAGNOSE` reproduction test on `FIX` track). Immediately `FAIL` any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local git commit.
    - **On Fail:** Set task `status: "FAIL"`, append exact `REQ-ID` (or test) defect to `blockers[]`, increment `retry_count`, and route back to `BUILDER`. If `retry_count >= 3`, halt for human intervention.
    - **On Pass:** Set task `status: "PASS"`, clear `blockers[]`, reset `retry_count: 0`. If a subtle repo quirk caused a failure or non-obvious fix, append 1 terse bullet to `.sdd/lessons.md` (keeping <= 30 lines; prune/merge older entries if needed). Stage and commit scoped task files locally (`git add <task_files> && git commit -m "feat(<feature_id>): <T_id> <short_desc>"` or `fix(<feature_id>): <T_id> <short_desc>`, including `.sdd/lessons.md` if updated); never run `git push`. If `PENDING` tasks remain, loop to `EXECUTE`; otherwise set `phase: "DONE"`.
 </state_machine_spec>
