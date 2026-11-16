@@ -1,81 +1,64 @@
 # ⚡ Spec-Driven Development (SDD) Harness
 
-A lightweight, model-agnostic execution loop for **Google Antigravity** (CLI & Desktop IDE) and **OpenAI Codex** (CLI & Desktop App). Treats `.sdd/spec.md` as an executable contract and `.sdd/state.json` as persistent disk state across sessions, restarts, and tool switches.
+A lightweight, model-agnostic execution loop for **Google Antigravity** (CLI & Desktop IDE) and **OpenAI Codex** (CLI & Desktop App). Treats `.sdd/spec.md` as an executable contract, `.sdd/lessons.md` as repo memory, and `.sdd/state.json` as persistent disk state across sessions and tool switches.
 
-## 🗂️ Repo Layout (Already Bootstrapped)
+## 🗂️ Repo Layout
 
 * **`AGENTS.md`** — Master system rules (auto-loaded by OpenAI Codex).
 * **`.gemini/GEMINI.md`** — Symlink to `AGENTS.md` (auto-loaded by Google Antigravity).
 * **`.sdd/spec.md`** — Locked requirements & `Out of Scope` fence (git-tracked).
-* **`.sdd/state.json`** — Live phase, persona, task queue, & retry ledger (git-ignored).
+* **`.sdd/lessons.md`** — Verified repo-specific gotchas & test quirks, `<= 30` lines (git-tracked).
+* **`.sdd/state.json`** — Live track, phase, persona, task queue, & retry ledger (git-ignored).
 
-## ✅ Execution Checklist (1 Feature at a Time)
+## ✅ Execution Checklists
 
-### Phase 1: Launch & Triage
+### Feature Track (Default: `--spec-only`)
+* [ ] **Launch** in repo root: `New feature: [describe feature]` (`--spec-only` is default).
+* [ ] **Triage:** Answer up to 3 questions if asked, or reply `skip`.
+* [ ] **Approve Spec:** Inspect `.sdd/spec.md`, then reply `approve` to unlock `PLAN -> EXECUTE -> VERIFY -> DONE`.
+* [ ] *(Only with `--gate-all`)* Review `tasks[]` in `.sdd/state.json` and reply `approve` again.
+* [ ] **Verify Commits:** Passing tasks auto-commit locally as `feat(<id>): <T_id> <desc>` (plus `.sdd/lessons.md` if updated). Never pushes remotely.
 
-* [ ] **Open Antigravity or Codex** in your repo root (recommended workhorse: `Gemini 4 Hydrogen`, `GPT-6.1 Sol`, or `Claude Sonnet 5.5`).
-* [ ] **Start a feature** using an inline HITL flag:
-  ```text
-  New feature: [DESCRIBE FEATURE OR BUG FIX] --spec-only
-  ```
-* [ ] **Answer up to 3 triage questions** if scope is vague (or reply `skip` to proceed immediately).
+### Bug-Fix Fast Path (`--fix`)
+* [ ] **Launch** with `--fix`: `Fix: [describe bug] --fix`
+* [ ] **Diagnose:** `BUILDER` reproduces the bug with a failing test (`DIAGNOSE`), skipping `SPECIFY` and `PLAN`.
+* [ ] **Fix & Verify:** `BUILDER` fixes it (`EXECUTE`), isolated `VERIFIER` audits the diff/test (`VERIFY`), and commits `fix(<id>): <T_id> <desc>`.
 
-### Phase 2: Spec & Plan Approval
+## 🎛️ Flags & Commands
 
-* [ ] **Inspect `.sdd/spec.md`** once `SPECIFIER` finishes generating requirements and the `## Out of Scope` fence.
-* [ ] **Approve the spec** to unlock execution:
-  ```text
-  approve
-  ```
-* [ ] *(Only in `--gate-all` mode)* Review `.sdd/state.json` task breakdown and reply `approve` again.
-
-### Phase 3: Autonomous Build & Isolated Verification
-
-* [ ] **Let `BUILDER` execute** each `PENDING` task (`T1..Tn`) one at a time with local tests/linters.
-* [ ] **Let `VERIFIER` audit** each task in an isolated context against `.sdd/spec.md` and `git diff`.
-* [ ] **Verify local auto-commits:** Every passing task automatically commits locally as `feat(<feature_id>): <T_id> <short_desc>` (never pushes remotely).
-* [ ] **Confirm `phase: "DONE"`** in the final status block (or resolve blockers manually if `retry_count` hits `3`).
-
-## 🎛️ Control Commands & HITL Modes
-
-Pass flags inline on launch or switch modes mid-run:
-
-| Command / Flag | Behavior | Best For |
+| Flag / Command | Behavior | Best For |
 | :--- | :--- | :--- |
-| `--spec-only` / `mode: spec-only` | Pauses once after `SPECIFY`, then auto-runs `PLAN -> EXECUTE -> VERIFY` | **Default 80/20 workflow** |
+| `--spec-only` / `mode: spec-only` | **(Default)** Pauses once after `SPECIFY`, then auto-runs `PLAN -> EXECUTE -> VERIFY` | Standard features |
 | `--gate-all` / `mode: gate-all` | Pauses after **both** `SPECIFY` and `PLAN` | High-risk or unfamiliar repos |
-| `--auto` / `mode: auto` | Runs end-to-end without pausing (unless `TRIAGE` hits ambiguity) | Small, well-defined bug fixes |
+| `--auto` / `mode: auto` | Runs `TRIAGE -> DONE` without pausing (unless `TRIAGE` hits ambiguity) | Well-defined tasks |
+| `--fix` | Sets `track: "FIX"`; runs `DIAGNOSE -> EXECUTE -> VERIFY -> DONE` | Bug fixes with a repro test |
 | `approve` | Advances past a `SPECIFY` or `PLAN` gate | Confirming specs/tasks |
-| `skip` | Bypasses `TRIAGE` questions using best-practice defaults | Fast starts |
-| `New feature: [desc]` | Resets a `DONE` `.sdd/state.json` for your next feature | Sequential features |
+| `skip` | Bypasses `TRIAGE` questions using defaults | Fast starts |
 
 ## 🧠 Recommended Model Routing
 
-* **Daily Workhorse (`BUILDER` + `VERIFIER`):**
-  * **Google Antigravity:** `Gemini 4 Hydrogen` — fast, low-cost, strict diff adherence, and high prompt-injection resilience.
-  * **OpenAI Codex:** `GPT-6.1 Sol` (default 500k context, `medium`/`high` reasoning effort) — fast multi-file edits and long-horizon diff adherence without burning quota.
-  * **Anthropic:** `Claude Sonnet 5.5` — top single-model terminal benchmark reliability.
+* **Workhorse (`BUILDER` + `VERIFIER`):**
+  * **Antigravity:** `Gemini 4 Hydrogen`
+  * **Codex:** `GPT-6.1 Sol`
+  * **Anthropic:** `Claude Sonnet 5.5`
 * **Heavy Architecture (`SPECIFIER` + `ARCHITECT`):**
-  * **Google Antigravity:** `Gemini 4 Carbon` or `Gemini 4 Argon`
-  * **OpenAI Codex:** `GPT-6.1 Terra` or `GPT-6 Astra` (`high` reasoning effort) — best for complex greenfield specs, multi-service contracts, and attached thread-fork verification before handing off to `Sol`.
+  * **Antigravity:** `Gemini 4 Carbon`
+  * **Codex:** `GPT-6.1 Terra`
   * **Anthropic:** `Claude Opus 5.5`
-* **Cross-Tool Handoffs:** Start a spec in **Antigravity IDE**, close it, and type `approve` in **Codex CLI** (or vice versa)—state persists automatically on disk.
+* **Cross-Tool Handoffs:** Start a spec in Antigravity, close it, and type `approve` in Codex (or vice versa)—state persists on disk.
 
-## 🔀 Running Multiple Features in Parallel
+## 🔀 Parallel Features (Git Worktrees)
 
-Keep **1 active feature per working directory** so `.sdd/state.json` and git diffs never collide. To run parallel agents in Antigravity Agent Manager or Codex threads, spin up a Git Worktree per feature:
+Keep **1 active feature per working directory**. Use a Git Worktree for concurrent work:
 
 ```bash
-# Create an isolated workspace + branch for a second concurrent feature
 git worktree add ../repo-feat-b -b feat/second-feature
-
-# Remove worktree after merging
 git worktree remove ../repo-feat-b
 ```
 
 ## ♻️ Reusing in New Repositories
 
-Copy `AGENTS.md` into any new project root and run one starter prompt—the harness auto-creates `.gemini/GEMINI.md`, `.sdd/`, and `.gitignore` rules on first turn:
+Copy `AGENTS.md` into any project root; the harness auto-creates `.gemini/GEMINI.md`, `.sdd/`, `.sdd/lessons.md`, and `.gitignore` rules on first turn:
 
 ```bash
 cp path/to/AGENTS.md ./AGENTS.md && git init && git add AGENTS.md && git commit -m "chore: add SDD harness"
