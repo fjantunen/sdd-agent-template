@@ -1,0 +1,17 @@
+{
+  "feature_id": "kebab-case-slug",
+  "track": "FEATURE",
+  "sdd_mode": "gated",
+  "phase": "TRIAGE",
+  "active_persona": "SPECIFIER",
+  "tasks": [
+    {
+      "id": "T1",
+      "desc": "Atomic task description",
+      "req_refs": ["REQ-1"],
+      "status": "PENDING"
+    }
+  ],
+  "blockers": [],
+  "retry_count": 0
+}

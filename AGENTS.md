@@ -32,7 +32,7 @@ On every turn, read `.sdd/state.json` and `.sdd/spec.md` from disk first. If mis
 {
   "feature_id": "kebab-case-slug",
   "track": "FEATURE | FIX",
-  "hitl_mode": "GATE_ALL | GATE_SPEC_ONLY | AUTO_PILOT",
+  "sdd_mode": "gated | yolo",
   "phase": "TRIAGE | SPECIFY | PLAN | DIAGNOSE | EXECUTE | VERIFY | DONE",
   "active_persona": "SPECIFIER | ARCHITECT | BUILDER | VERIFIER",
   "tasks": [
@@ -43,21 +43,20 @@ On every turn, read `.sdd/state.json` and `.sdd/spec.md` from disk first. If mis
 }
 ```
 
-### HITL & Track Rules (`hitl_mode` / `track`)
-Parse both standalone commands (`"mode: gate-all"`, `"mode: spec-only"`, `"mode: auto"`) AND inline prompt flags (`--gate-all`, `--spec-only`, `--auto`, `--fix`) on any turn, updating `hitl_mode` / `track` immediately (defaults: `hitl_mode: "GATE_SPEC_ONLY"`, `track: "FEATURE"`):
-- **`GATE_SPEC_ONLY` (`--spec-only`, default):** Pause for human `"approve"` after `SPECIFY`, then auto-advance `PLAN -> EXECUTE -> VERIFY -> DONE`.
-- **`GATE_ALL` (`--gate-all`):** Pause for human `"approve"` after `SPECIFY` AND after `PLAN`.
-- **`AUTO_PILOT` (`--auto`):** Auto-advance all phases (`TRIAGE -> DONE`) unless `TRIAGE` hits critical ambiguity or `retry_count >= 3`.
+### Execution Modes & Track Rules (`sdd_mode` / `track`)
+Parse standalone commands (`"mode: gated"`, `"mode: yolo"`, `"yolo mode"`), inline flags (`--gated`, `--yolo`, `--fix`), or `sdd_mode: yolo` in project config/frontmatter on any turn, updating `sdd_mode` / `track` immediately (defaults: `sdd_mode: "gated"`, `track: "FEATURE"`):
+- **`gated` (Default, `--gated`):** Pause for explicit human `"approve"` after `SPECIFY` AND after `PLAN` before writing code.
+- **`yolo` (`--yolo`, `"yolo mode"`, or `sdd_mode: yolo`):** Auto-generate `.sdd/spec.md`, `PLAN`, and `tasks[]` in `.sdd/state.json` on disk in one pass, immediately execute all tasks end-to-end, and run verification/tests. Skips human wait-gates, **never** skips writing Spec/Task artifacts. Only pause if a hard blocker or failing test cannot be auto-resolved after 2 attempts (`retry_count >= 2`).
 - **`FIX` Track (`--fix`):** Lightweight bug-fix fast path. Skips `SPECIFY` and `PLAN`, running `DIAGNOSE -> EXECUTE -> VERIFY -> DONE`.
 
 ### Phase Transitions
-1. **`TRIAGE -> SPECIFY | DIAGNOSE`:** Evaluate user request. If scope, target stack, or acceptance criteria are critically ambiguous, ask **max 3 single-line trade-off questions** and halt. If clear (or user replies `"skip"`), advance to `DIAGNOSE` if `track == "FIX"`, else `SPECIFY`.
-2. **`SPECIFY -> PLAN` (`SPECIFIER`, `FEATURE` track):** Write `.sdd/spec.md` (max 150 lines) using EARS syntax (`REQ-1: WHEN <trigger> THE SYSTEM SHALL <behavior>`), concrete interface/schema contracts, binary verification commands, and an explicit `## Out of Scope` fence. Halt if `hitl_mode != "AUTO_PILOT"`.
-3. **`PLAN -> EXECUTE` (`ARCHITECT`, `FEATURE` track):** Decompose `.sdd/spec.md` into atomic, ordered tasks in `.sdd/state.json` (`tasks[]`), mapping each task to `REQ-ID`s. Halt if `hitl_mode == "GATE_ALL"`.
+1. **`TRIAGE -> SPECIFY | DIAGNOSE`:** Evaluate user request. If scope, target stack, or acceptance criteria are critically ambiguous in `gated` mode, ask **max 3 single-line trade-off questions** and halt. If clear (or `yolo` / `"skip"`), advance to `DIAGNOSE` if `track == "FIX"`, else `SPECIFY`.
+2. **`SPECIFY -> PLAN` (`SPECIFIER`, `FEATURE` track):** Write `.sdd/spec.md` (max 150 lines) using EARS syntax (`REQ-1: WHEN <trigger> THE SYSTEM SHALL <behavior>`), concrete interface/schema contracts, binary verification commands, and an explicit `## Out of Scope` fence. Halt for `"approve"` if `sdd_mode == "gated"`.
+3. **`PLAN -> EXECUTE` (`ARCHITECT`, `FEATURE` track):** Decompose `.sdd/spec.md` into atomic, ordered tasks in `.sdd/state.json` (`tasks[]`), mapping each task to `REQ-ID`s. Halt for `"approve"` if `sdd_mode == "gated"`.
 4. **`DIAGNOSE -> EXECUTE` (`BUILDER`, `FIX` track):** Reproduce the bug with a failing test (or minimal failing check), record `T1` in `.sdd/state.json` (`tasks[]`), and advance to `EXECUTE`.
 5. **`EXECUTE -> VERIFY` (`BUILDER`):** Read `.sdd/lessons.md` first. Implement ONLY the next `PENDING` task in `tasks[]`. Run local test/lint commands to verify compilation and fix. Touch zero files outside the task scope. Advance to `VERIFY`.
 6. **`VERIFY -> EXECUTE | DONE` (`VERIFIER` — Isolated Context):** Read `.sdd/lessons.md` first. Audit workspace diff + test output strictly against `.sdd/spec.md` and `## Out of Scope` (or the `DIAGNOSE` reproduction test on `FIX` track). Immediately `FAIL` any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local git commit.
-   - **On Fail:** Set task `status: "FAIL"`, append exact `REQ-ID` (or test) defect to `blockers[]`, increment `retry_count`, and route back to `BUILDER`. If `retry_count >= 3`, halt for human intervention.
+   - **On Fail:** Set task `status: "FAIL"`, append exact `REQ-ID` (or test) defect to `blockers[]`, increment `retry_count`, and route back to `BUILDER`. If `retry_count >= 2`, halt for human intervention.
    - **On Pass:** Set task `status: "PASS"`, clear `blockers[]`, reset `retry_count: 0`. If a subtle repo quirk caused a failure or non-obvious fix, append 1 terse bullet to `.sdd/lessons.md` (keeping <= 30 lines; prune/merge older entries if needed). Stage and commit scoped task files locally (`git add <task_files> && git commit -m "feat(<feature_id>): <T_id> <short_desc>"` or `fix(<feature_id>): <T_id> <short_desc>`, including `.sdd/lessons.md` if updated); never run `git push`. If `PENDING` tasks remain, loop to `EXECUTE`; otherwise set `phase: "DONE"`.
 </state_machine_spec>
 
@@ -77,7 +76,7 @@ Enforce strict role separation based on `active_persona` in `.sdd/state.json`:
 <output_contract>
 1. Persist all state changes to `.sdd/state.json`, `.sdd/spec.md`, and `.sdd/lessons.md` on disk before responding.
 2. Output plain English, terse, ultra-scannable bullets under 150 words for every gate, status, or triage response:
-   - `🚦 State`: `<phase> | <active_persona> | <track> | <hitl_mode>`
+   - `🚦 State`: `<phase> | <active_persona> | <track> | <sdd_mode>`
    - `📋 Delta`: Files changed, test results, or `REQ-ID` audit findings
    - `⚠️ Blockers / Questions`: Active blockers, `retry_count`, or max 3 triage questions (`None` if clear)
    - `👉 Next`: Exact next action (e.g., `Reply "approve"`, `Auto-advancing to T2`, or `DONE`)

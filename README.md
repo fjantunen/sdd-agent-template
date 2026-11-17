@@ -1,71 +1,69 @@
-# ⚡ Spec-Driven Development (SDD) Harness
+# ⚡ `sdd-agent-template` — Spec-Driven Development Harness
 
-A lightweight, model-agnostic execution loop for **Google Antigravity** (CLI & Desktop IDE) and **OpenAI Codex** (CLI & Desktop App). Treats `.sdd/spec.md` as an executable contract, `.sdd/lessons.md` as repo memory, and `.sdd/state.json` as persistent disk state across sessions and tool switches.
+Stop coding agents from drifting mid-feature with a file-backed Spec → Plan → Execute → Verify loop.
+Keeps `.sdd/spec.md`, `.sdd/lessons.md`, and `.sdd/state.json` on disk so context stays lean and cross-agent handoffs stay deterministic.
+
+---
+
+## 🚀 Quick Start
+
+### Option A: Brownfield (1-Line Skill Install)
+
+Add the `sdd` skill to any existing repository (works with Claude Code, Cursor, Codex, Gemini, and Antigravity):
+
+```bash
+npx skills add fjantunen/sdd-agent-template
+```
+
+Invoke it directly in your agent chat:
+
+```text
+Use the sdd skill to add rate limiting to /api/login
+```
+
+### Option B: Greenfield (GitHub Template)
+
+1. Click **`Use this template`** on GitHub to create a new repository with [AGENTS.md](AGENTS.md), [.gemini/GEMINI.md](.gemini/GEMINI.md), [.sdd/lessons.md](.sdd/lessons.md), and [.agents/skills/sdd/SKILL.md](.agents/skills/sdd/SKILL.md) pre-wired.
+2. Clone your repo and start a feature or bug fix in your agent:
+   - **Feature:** `New feature: [describe feature]`
+   - **Bug Fix (`--fix`):** `Fix: [describe bug] --fix` *(skips Spec/Plan; runs `DIAGNOSE -> EXECUTE -> VERIFY -> DONE`)*
+
+---
+
+## 🎛️ Execution Modes: Gated vs. YOLO
+
+Both modes write `.sdd/spec.md` and `.sdd/state.json` (`tasks[]`) to disk for auditability and lean context.
+
+| Mode | Trigger | Behavior |
+| :--- | :--- | :--- |
+| **Gated Mode** *(Default)* | Default, `--gated`, `mode: gated` | Pauses after **Spec** (`SPECIFY`) and **Plan** (`PLAN`) for explicit `approve` before writing code. |
+| **YOLO Mode** | `--yolo`, `"yolo mode"`, or `sdd_mode: yolo` in config/frontmatter | Auto-generates Spec, Plan, and Task breakdown in one pass, executes all tasks end-to-end, runs tests/verification, and only pauses on a hard blocker or failing test after 2 attempts. |
+
+**Copy-paste prompt examples:**
+
+```text
+# Gated Mode (default) — review spec & plan before code is written
+New feature: Add JWT refresh token rotation with tests
+```
+
+```text
+# YOLO Mode — write spec & tasks to disk, then execute & verify end-to-end
+New feature: Add JWT refresh token rotation with tests --yolo
+```
+
+---
 
 ## 🗂️ Repo Layout
 
-* **`AGENTS.md`** — Master system rules (auto-loaded by OpenAI Codex).
-* **`.gemini/GEMINI.md`** — Symlink to `AGENTS.md` (auto-loaded by Google Antigravity).
-* **`.sdd/spec.md`** — Locked requirements & `Out of Scope` fence (git-tracked).
-* **`.sdd/lessons.md`** — Verified repo-specific gotchas & test quirks, `<= 30` lines (git-tracked).
-* **`.sdd/state.json`** — Live track, phase, persona, task queue, & retry ledger (git-ignored).
+* **[AGENTS.md](AGENTS.md)** — Master harness rules (auto-loaded by OpenAI Codex).
+* **[.gemini/GEMINI.md](.gemini/GEMINI.md)** — Symlink to `AGENTS.md` (auto-loaded by Google Antigravity).
+* **[.agents/skills/sdd/SKILL.md](.agents/skills/sdd/SKILL.md)** — Portable `agentskills.io` skill + [spec-template.md](.agents/skills/sdd/references/spec-template.md) and [state-template.json](.agents/skills/sdd/references/state-template.json).
+* **[.sdd/lessons.md](.sdd/lessons.md)** — Verified repo-specific gotchas & test quirks, `<= 30` lines (git-tracked).
+* **`.sdd/spec.md`** — Locked EARS requirements & `Out of Scope` fence (created per feature, git-tracked).
+* **`.sdd/state.json`** — Live track, `sdd_mode`, phase, persona, task queue, & retry ledger (git-ignored).
 
-## ✅ Execution Checklists
+## 🛡️ Security & Hygiene
 
-### Feature Track (Default: `--spec-only`)
-* [ ] **Launch** in repo root: `New feature: [describe feature]` (`--spec-only` is default).
-* [ ] **Triage:** Answer up to 3 questions if asked, or reply `skip`.
-* [ ] **Approve Spec:** Inspect `.sdd/spec.md`, then reply `approve` to unlock `PLAN -> EXECUTE -> VERIFY -> DONE`.
-* [ ] *(Only with `--gate-all`)* Review `tasks[]` in `.sdd/state.json` and reply `approve` again.
-* [ ] **Verify Commits:** Passing tasks auto-commit locally as `feat(<id>): <T_id> <desc>` (plus `.sdd/lessons.md` if updated). Never pushes remotely.
-
-### Bug-Fix Fast Path (`--fix`)
-* [ ] **Launch** with `--fix`: `Fix: [describe bug] --fix`
-* [ ] **Diagnose:** `BUILDER` reproduces the bug with a failing test (`DIAGNOSE`), skipping `SPECIFY` and `PLAN`.
-* [ ] **Fix & Verify:** `BUILDER` fixes it (`EXECUTE`), isolated `VERIFIER` audits the diff/test (`VERIFY`), and commits `fix(<id>): <T_id> <desc>`.
-
-## 🎛️ Flags & Commands
-
-| Flag / Command | Behavior | Best For |
-| :--- | :--- | :--- |
-| `--spec-only` / `mode: spec-only` | **(Default)** Pauses once after `SPECIFY`, then auto-runs `PLAN -> EXECUTE -> VERIFY` | Standard features |
-| `--gate-all` / `mode: gate-all` | Pauses after **both** `SPECIFY` and `PLAN` | High-risk or unfamiliar repos |
-| `--auto` / `mode: auto` | Runs `TRIAGE -> DONE` without pausing (unless `TRIAGE` hits ambiguity) | Well-defined tasks |
-| `--fix` | Sets `track: "FIX"`; runs `DIAGNOSE -> EXECUTE -> VERIFY -> DONE` | Bug fixes with a repro test |
-| `approve` | Advances past a `SPECIFY` or `PLAN` gate | Confirming specs/tasks |
-| `skip` | Bypasses `TRIAGE` questions using defaults | Fast starts |
-
-## 🧠 Recommended Model Routing
-
-* **Workhorse (`BUILDER` + `VERIFIER`):**
-  * **Antigravity:** `Gemini 4 Hydrogen`
-  * **Codex:** `GPT-6.1 Sol`
-  * **Anthropic:** `Claude Sonnet 5.5`
-* **Heavy Architecture (`SPECIFIER` + `ARCHITECT`):**
-  * **Antigravity:** `Gemini 4 Carbon`
-  * **Codex:** `GPT-6.1 Terra`
-  * **Anthropic:** `Claude Opus 5.5`
-* **Cross-Tool Handoffs:** Start a spec in Antigravity, close it, and type `approve` in Codex (or vice versa)—state persists on disk.
-
-## 🔀 Parallel Features (Git Worktrees)
-
-Keep **1 active feature per working directory**. Use a Git Worktree for concurrent work:
-
-```bash
-git worktree add ../repo-feat-b -b feat/second-feature
-git worktree remove ../repo-feat-b
-```
-
-## 🛡️ Security Guardrails
-
-* **Secrets Shield:** `.env*` (allowing `.env.example`), `*.pem`, `*.key`, and `*credentials*.json` are git-ignored and never read, printed, or staged.
-* **Supply-Chain Gate:** Unapproved package installs (`npm install`, `pip install`, `cargo add`, `go get`) and `curl | sh` hard-halt unless the exact package is approved in `.sdd/spec.md`.
-* **Diff Secret Check:** `VERIFIER` immediately `FAIL`s any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local commit.
-
-## ♻️ Reusing in New Repositories
-
-Copy `AGENTS.md` into any project root; the harness auto-creates `.gemini/GEMINI.md`, `.sdd/`, `.sdd/lessons.md`, and `.gitignore` rules on first turn:
-
-```bash
-cp path/to/AGENTS.md ./AGENTS.md && git init && git add AGENTS.md && git commit -m "chore: add SDD harness"
-```
+* **Secrets Shield:** `.env*` (allowing `!.env.example`), `*.pem`, `*.key`, and `*credentials*.json` are git-ignored in [.gitignore](.gitignore) and never read, printed, or staged.
+* **Supply-Chain Gate:** Unapproved package installs (`npm install`, `pip install`, `cargo add`, `go get`) and `curl | sh` hard-halt unless explicitly approved in `.sdd/spec.md`.
+* **Diff Secret Check:** `VERIFIER` immediately `FAIL`s any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local commit (`git push` is never run automatically).
