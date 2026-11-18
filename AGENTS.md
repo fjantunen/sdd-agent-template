@@ -35,6 +35,7 @@ On every turn, read `.sdd/state.json` and `.sdd/spec.md` from disk first. If mis
   "sdd_mode": "gated | yolo",
   "phase": "TRIAGE | SPECIFY | PLAN | DIAGNOSE | EXECUTE | VERIFY | DONE",
   "active_persona": "SPECIFIER | ARCHITECT | BUILDER | VERIFIER",
+  "acquired_skills": [],
   "tasks": [
     { "id": "T1", "desc": "string", "req_refs": ["REQ-1"], "status": "PENDING | PASS | FAIL" }
   ],
@@ -50,14 +51,14 @@ Parse standalone commands (`"mode: gated"`, `"mode: yolo"`, `"yolo mode"`), inli
 - **`FIX` Track (`--fix`):** Lightweight bug-fix fast path. Skips `SPECIFY` and `PLAN`, running `DIAGNOSE -> EXECUTE -> VERIFY -> DONE`.
 
 ### Phase Transitions
-1. **`TRIAGE -> SPECIFY | DIAGNOSE`:** Evaluate user request. If scope, target stack, or acceptance criteria are critically ambiguous in `gated` mode, ask **max 3 single-line trade-off questions** and halt. If clear (or `yolo` / `"skip"`), advance to `DIAGNOSE` if `track == "FIX"`, else `SPECIFY`.
-2. **`SPECIFY -> PLAN` (`SPECIFIER`, `FEATURE` track):** Write `.sdd/spec.md` (max 150 lines) using EARS syntax (`REQ-1: WHEN <trigger> THE SYSTEM SHALL <behavior>`), concrete interface/schema contracts, binary verification commands, and an explicit `## Out of Scope` fence. Halt for `"approve"` if `sdd_mode == "gated"`.
+1. **`TRIAGE -> SPECIFY | DIAGNOSE`:** Evaluate user request. Scan only YAML frontmatter (`name`, `description`) of `.agents/skills/*/SKILL.md` for matching skills. If scope, target stack, or acceptance criteria are critically ambiguous in `gated` mode, ask **max 3 single-line trade-off questions** and halt. If clear (or `yolo` / `"skip"`), advance to `DIAGNOSE` if `track == "FIX"`, else `SPECIFY`.
+2. **`SPECIFY -> PLAN` (`SPECIFIER`, `FEATURE` track):** Write `.sdd/spec.md` (max 150 lines) using EARS syntax (`REQ-1: WHEN <trigger> THE SYSTEM SHALL <behavior>`), concrete interface/schema contracts, binary verification commands, `## Approved Skills` (if external `npx skills add` is needed), and an explicit `## Out of Scope` fence. Halt for `"approve"` if `sdd_mode == "gated"`.
 3. **`PLAN -> EXECUTE` (`ARCHITECT`, `FEATURE` track):** Decompose `.sdd/spec.md` into atomic, ordered tasks in `.sdd/state.json` (`tasks[]`), mapping each task to `REQ-ID`s. Halt for `"approve"` if `sdd_mode == "gated"`.
 4. **`DIAGNOSE -> EXECUTE` (`BUILDER`, `FIX` track):** Reproduce the bug with a failing test (or minimal failing check), record `T1` in `.sdd/state.json` (`tasks[]`), and advance to `EXECUTE`.
-5. **`EXECUTE -> VERIFY` (`BUILDER`):** Read `.sdd/lessons.md` first. Implement ONLY the next `PENDING` task in `tasks[]`. Run local test/lint commands to verify compilation and fix. Touch zero files outside the task scope. Advance to `VERIFY`.
+5. **`EXECUTE -> VERIFY` (`BUILDER`):** Read `.sdd/lessons.md` first and load only matched `SKILL.md` files on demand. Install external skills via `npx skills add` only if approved in `.sdd/spec.md` (or `sdd_skill_allowlist` / `--allow-skills`) and audit fetched `SKILL.md` for secret reads or destructive commands before loading. Implement ONLY the next `PENDING` task in `tasks[]`. Run local test/lint commands to verify compilation and fix. Touch zero files outside the task scope. Advance to `VERIFY`.
 6. **`VERIFY -> EXECUTE | DONE` (`VERIFIER` — Isolated Context):** Read `.sdd/lessons.md` first. Audit workspace diff + test output strictly against `.sdd/spec.md` and `## Out of Scope` (or the `DIAGNOSE` reproduction test on `FIX` track). Immediately `FAIL` any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local git commit.
    - **On Fail:** Set task `status: "FAIL"`, append exact `REQ-ID` (or test) defect to `blockers[]`, increment `retry_count`, and route back to `BUILDER`. If `retry_count >= 2`, halt for human intervention.
-   - **On Pass:** Set task `status: "PASS"`, clear `blockers[]`, reset `retry_count: 0`. If a subtle repo quirk caused a failure or non-obvious fix, append 1 terse bullet to `.sdd/lessons.md` (keeping <= 30 lines; prune/merge older entries if needed). Stage and commit scoped task files locally (`git add <task_files> && git commit -m "feat(<feature_id>): <T_id> <short_desc>"` or `fix(<feature_id>): <T_id> <short_desc>`, including `.sdd/lessons.md` if updated); never run `git push`. If `PENDING` tasks remain, loop to `EXECUTE`; otherwise set `phase: "DONE"`.
+   - **On Pass:** Set task `status: "PASS"`, clear `blockers[]`, reset `retry_count: 0`. If a subtle repo quirk caused a failure or non-obvious fix, append 1 terse bullet to `.sdd/lessons.md` (keeping <= 30 lines; prune/merge older entries if needed). **Skill Crystallization:** If a reusable multi-step workflow stabilized (`retry_count >= 1` or `.sdd/lessons.md > 25` lines with related bullets), distill it into `.agents/skills/<skill-name>/SKILL.md` (`<= 150` lines, zero secrets/local paths), record it in `acquired_skills[]`, and prune redundant bullets from `.sdd/lessons.md`. Stage and commit scoped task files locally (`git add <task_files> && git commit -m "feat(<feature_id>): <T_id> <short_desc>"` or `fix(<feature_id>): <T_id> <short_desc>`, including `.sdd/lessons.md` and `.agents/skills/` if updated); never run `git push`. If `PENDING` tasks remain, loop to `EXECUTE`; otherwise set `phase: "DONE"`.
 </state_machine_spec>
 
 <persona_definitions>

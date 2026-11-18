@@ -4,6 +4,7 @@
   "sdd_mode": "gated",
   "phase": "TRIAGE",
   "active_persona": "SPECIFIER",
+  "acquired_skills": [],
   "tasks": [
     {
       "id": "T1",

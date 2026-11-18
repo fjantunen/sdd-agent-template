@@ -48,13 +48,19 @@ Enforce strict persona separation via `active_persona` in `.sdd/state.json`:
    - **On Fail:** Set task `status: "FAIL"`, append exact `REQ-ID`/test defect to `blockers[]`, increment `retry_count`, and route to `BUILDER`. Halt for human intervention if `retry_count >= 2`.
    - **On Pass:** Set task `status: "PASS"`, clear `blockers[]`, reset `retry_count: 0`. If a subtle repo quirk caused a failure or non-obvious fix, append 1 terse bullet to `.sdd/lessons.md` (keeping `<= 30` lines). Commit scoped task files locally (`feat(<feature_id>): <T_id> <short_desc>` or `fix(<feature_id>): <T_id> <short_desc>`, plus `.sdd/lessons.md` if updated); never `git push`. Loop to `EXECUTE` if `PENDING` tasks remain, else set `phase: "DONE"`.
 
-## 4. Guardrails & Grounding
+## 4. Skill Acquisition & Crystallization
+
+- **Progressive Scan (`TRIAGE` / `EXECUTE`):** Read only YAML `name` and `description` of `.agents/skills/*/SKILL.md`; load full `SKILL.md` only when triggered.
+- **External Discovery & Safety Gate:** If a needed capability is missing, search with `npx skills find <query>` and propose it under `## Approved Skills` in `.sdd/spec.md`. Never run `npx skills add` without spec approval (or `sdd_skill_allowlist` / `--allow-skills` in `yolo` mode). Audit any fetched `SKILL.md` for secret reads or destructive commands before loading, and record it in `acquired_skills[]`.
+- **Internal Crystallization (`VERIFY -> DONE`):** When a reusable multi-step workflow stabilizes (`retry_count >= 1` or `.sdd/lessons.md > 25` lines with related bullets), distill it into `.agents/skills/<skill-name>/SKILL.md` (`<= 150` lines, zero secrets/local paths) using [references/skill-template.md](references/skill-template.md), record it in `acquired_skills[]`, and prune redundant bullets from `.sdd/lessons.md`.
+
+## 5. Guardrails & Grounding
 
 - **Secrets Shield:** Never read, print, or stage `.env*` (except `.env.example`), `*.pem`, `*.key`, or `*credentials*.json`.
 - **Hard Halt:** Never run `git push`, `git reset --hard`, `rm -rf`, DB drops, `curl | sh`, or unapproved package installs (`npm install`, `pip install`, `cargo add`, `go get`) unless the exact package is approved in `.sdd/spec.md`.
 - **Closed-World Grounding:** Never invent APIs, dependencies, or env vars not present in the repo or `.sdd/spec.md`; halt with `ERR_INSUFFICIENT_SPEC: [missing detail]`.
 
-## 5. Output Contract
+## 6. Output Contract
 
 Persist `.sdd/state.json`, `.sdd/spec.md`, and `.sdd/lessons.md` before responding. Keep gate, status, and triage responses under 150 words:
 - `🚦 State`: `<phase> | <active_persona> | <track> | <sdd_mode>`
