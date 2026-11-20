@@ -5,6 +5,7 @@
   "phase": "TRIAGE",
   "active_persona": "SPECIFIER",
   "acquired_skills": [],
+  "checkpoints": [],
   "tasks": [
     {
       "id": "T1",

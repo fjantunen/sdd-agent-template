@@ -1,4 +1,5 @@
 .sdd/state.json
+.sdd/checkpoints/
 .env*
 !.env.example
 *.pem

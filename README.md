@@ -28,11 +28,12 @@ Use the sdd skill to add rate limiting to /api/login
 
 * **[AGENTS.md](AGENTS.md)** — Master system rules (auto-loaded by OpenAI Codex).
 * **[.gemini/GEMINI.md](.gemini/GEMINI.md)** — Symlink to `AGENTS.md` (auto-loaded by Google Antigravity).
-* **[.agents/skills/sdd/SKILL.md](.agents/skills/sdd/SKILL.md)** — Portable `agentskills.io` skill + [spec-template.md](.agents/skills/sdd/references/spec-template.md), [state-template.json](.agents/skills/sdd/references/state-template.json), and [skill-template.md](.agents/skills/sdd/references/skill-template.md).
+* **[.agents/skills/sdd/SKILL.md](.agents/skills/sdd/SKILL.md)** — Portable `agentskills.io` skill + [spec-template.md](.agents/skills/sdd/references/spec-template.md), [state-template.json](.agents/skills/sdd/references/state-template.json), [skill-template.md](.agents/skills/sdd/references/skill-template.md), and [checkpoint.py](.agents/skills/sdd/scripts/checkpoint.py).
 * **[scripts/validate-skills.py](scripts/validate-skills.py)** — Validates skill frontmatter, line limits, JSON templates, symlinks, and relative links.
 * **`.sdd/spec.md`** — Locked EARS requirements & `Out of Scope` fence (created per feature, git-tracked).
 * **[.sdd/lessons.md](.sdd/lessons.md)** — Verified repo-specific gotchas & test quirks, `<= 30` lines (git-tracked).
-* **`.sdd/state.json`** — Live track, `sdd_mode`, phase, persona, `acquired_skills[]`, task queue, & retry ledger (git-ignored).
+* **`.sdd/state.json`** — Live track, `sdd_mode`, phase, persona, `acquired_skills[]`, `checkpoints[]`, task queue, & retry ledger (git-ignored).
+* **`.sdd/checkpoints/`** — Pre-task snapshots (last 3 versions retained & auto-pruned; git-ignored).
 
 ## ✅ Execution Checklists
 
@@ -99,6 +100,7 @@ git worktree remove ../repo-feat-b
 * **Secrets Shield:** `.env*` (allowing `!.env.example`), `*.pem`, `*.key`, and `*credentials*.json` are git-ignored in [.gitignore](.gitignore) and never read, printed, or staged.
 * **Supply-Chain Gate:** Unapproved package installs (`npm install`, `pip install`, `cargo add`, `go get`), `npx skills add`, and `curl | sh` hard-halt unless explicitly approved in `.sdd/spec.md` (or `sdd_skill_allowlist` / `--allow-skills` for skills).
 * **Skill Acquisition & Crystallization:** `TRIAGE` scans only skill frontmatter (`name`, `description`) to keep context lean; reusable workflows (`retry_count >= 1` or `.sdd/lessons.md > 25` lines) auto-crystallize into `.agents/skills/<name>/SKILL.md` after `VERIFIER` audit.
+* **Auto-Rollback & Checkpoints:** Before each `EXECUTE` task, [checkpoint.py](.agents/skills/sdd/scripts/checkpoint.py) snapshots the workspace into `.sdd/checkpoints/`, retains the **last 3 versions**, and auto-prunes older ones. On `VERIFY` failure, it auto-rolls back failed edits while preserving `.sdd/` state, specs, and blockers.
 * **Diff Secret Check:** `VERIFIER` immediately `FAIL`s any `git diff` containing hardcoded secrets, tokens, or sensitive credential files before local commit.
 
 ## ♻️ Reusing in New Repositories

@@ -12,7 +12,7 @@ Execute software changes through a file-backed state machine using `.sdd/spec.md
 On first activation in a repository:
 1. Ensure `.sdd/` exists and initialize `.sdd/lessons.md` from [references/lessons-template.md](references/lessons-template.md) (`<= 30` lines, git-tracked).
 2. Read `.sdd/state.json` and `.sdd/spec.md` on every turn. If `.sdd/state.json` is missing, initialize it from [references/state-template.json](references/state-template.json).
-3. Ensure `.gitignore` ignores `.sdd/state.json`, `.env*` (allowing `!.env.example`), `*.pem`, `*.key`, and `*credentials*.json` while keeping `.sdd/spec.md` and `.sdd/lessons.md` git-tracked.
+3. Ensure `.gitignore` ignores `.sdd/state.json`, `.sdd/checkpoints/`, `.env*` (allowing `!.env.example`), `*.pem`, `*.key`, and `*credentials*.json` while keeping `.sdd/spec.md` and `.sdd/lessons.md` git-tracked.
 
 ## 2. Execution Modes & Tracks
 
@@ -40,12 +40,13 @@ Enforce strict persona separation via `active_persona` in `.sdd/state.json`:
 4. **`DIAGNOSE -> EXECUTE`** (`BUILDER`, `FIX` track)
    - Reproduce the bug with a minimal failing test/check, record `T1` in `.sdd/state.json`, and advance to `EXECUTE`.
 5. **`EXECUTE -> VERIFY`** (`BUILDER`)
-   - Read `.sdd/lessons.md` first. Implement **only** the next `PENDING` task without touching unrelated files or altering `.sdd/spec.md`.
+   - Read `.sdd/lessons.md` first. Save a pre-task checkpoint (`python3 .agents/skills/sdd/scripts/checkpoint.py save <T_id>`) keeping the **last 3 versions** and auto-pruning older ones (record ID in `checkpoints[]`, max 3).
+   - Implement **only** the next `PENDING` task without touching unrelated files or altering `.sdd/spec.md`.
    - Run local test/lint commands to verify compilation and behavior, then advance to `VERIFY`.
 6. **`VERIFY -> EXECUTE | DONE`** (`VERIFIER` — Isolated Context)
    - Spawn an isolated subagent / fresh verification context (loaded only with `.sdd/spec.md`, `.sdd/lessons.md`, `.sdd/state.json`, and `git diff`; strip `BUILDER` rationale). If subagents are unavailable in the host runtime (Claude Code, Cursor, Codex, Gemini, Antigravity), audit adversarially in-thread using quote-anchoring.
    - Audit `git diff` + test output against `.sdd/spec.md` and `## Out of Scope` (or the `DIAGNOSE` repro test on `FIX`). Immediately `FAIL` any diff containing hardcoded secrets, tokens, or credential files.
-   - **On Fail:** Set task `status: "FAIL"`, append exact `REQ-ID`/test defect to `blockers[]`, increment `retry_count`, and route to `BUILDER`. Halt for human intervention if `retry_count >= 2`.
+   - **On Fail:** Auto-rollback workspace changes to the latest checkpoint (`python3 .agents/skills/sdd/scripts/checkpoint.py rollback`) while preserving `.sdd/` state/specs/lessons. Set task `status: "FAIL"`, append exact `REQ-ID`/test defect to `blockers[]`, increment `retry_count`, and route to `BUILDER`. Halt for human intervention if `retry_count >= 2`.
    - **On Pass:** Set task `status: "PASS"`, clear `blockers[]`, reset `retry_count: 0`. If a subtle repo quirk caused a failure or non-obvious fix, append 1 terse bullet to `.sdd/lessons.md` (keeping `<= 30` lines). Commit scoped task files locally (`feat(<feature_id>): <T_id> <short_desc>` or `fix(<feature_id>): <T_id> <short_desc>`, plus `.sdd/lessons.md` if updated); never `git push`. Loop to `EXECUTE` if `PENDING` tasks remain, else set `phase: "DONE"`.
 
 ## 4. Skill Acquisition & Crystallization
